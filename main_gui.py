@@ -170,17 +170,19 @@ class IDCardApp:
         return os.path.join(base, rel_path)
 
     def _set_window_icon(self):
-        logo_path = self._resource_path("logo.png")
-        if os.path.isfile(logo_path):
-            try:
-                img = Image.open(logo_path)
-                self._logo_icon = ImageTk.PhotoImage(img)
-                self.root.tk.call('wm', 'iconphoto', self.root._w, '-default', self._logo_icon)
-                return
-            except:
-                pass
-        blank = tk.PhotoImage(width=1, height=1)
-        self.root.tk.call('wm', 'iconphoto', self.root._w, '-default', blank)
+        try:
+            self.root.iconbitmap(default=self._resource_path("logo.ico"))
+            return
+        except:
+            pass
+        try:
+            from PIL import ImageTk
+            img = Image.open(self._resource_path("logo.png"))
+            self._logo_icon = ImageTk.PhotoImage(img)
+            self.root.tk.call('wm', 'iconphoto', self.root._w, '-default', self._logo_icon)
+            return
+        except:
+            pass
 
     def _rebuild_menu(self):
         self.root.config(menu=tk.Menu(self.root))

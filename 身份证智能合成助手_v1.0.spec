@@ -5,7 +5,7 @@ a = Analysis(
     ['main_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('haarcascade_frontalface_default.xml', '.'), ('logo.png', '.')],
+    datas=[('haarcascade_frontalface_default.xml', '.'), ('logo.png', '.'), ('logo.ico', '.')],
     hiddenimports=['windnd'],
     hookspath=[],
     hooksconfig={},
