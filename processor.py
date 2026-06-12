@@ -255,7 +255,8 @@ class IDCardProcessor:
 
     def process_pair(self, path1, path2, out_path, layout='vertical',
                      watermark_text=None, watermark_opacity=0.30,
-                     watermark_font_size=48, watermark_angle=30):
+                     watermark_font_size=48, watermark_angle=30,
+                     export_mode="image"):
         self.log("提取并校准图像...")
         raw1 = self.get_perspective_crop(cv2.imread(path1))
         raw2 = self.get_perspective_crop(cv2.imread(path2))
@@ -273,32 +274,44 @@ class IDCardProcessor:
         else:
             p_final, e_final = p_img2, e_img1
             
-        # Standard ID card dimensions at 300DPI approx 1011x638
+        # Standard ID card dimensions at 300DPI
+        # Real ID-1 card: 85.6mm x 54.0mm
+        # At 300 DPI: ~1011 x 638 px
         tw, th = 1011, 638
         p_pil = Image.fromarray(cv2.cvtColor(p_final, cv2.COLOR_BGR2RGB)).resize((tw, th), Image.Resampling.LANCZOS)
         e_pil = Image.fromarray(cv2.cvtColor(e_final, cv2.COLOR_BGR2RGB)).resize((tw, th), Image.Resampling.LANCZOS)
         
-        # Create canvas
+        # Create card composite (front + back)
         if layout == 'horizontal':
-            canvas = Image.new('RGB', ((tw * 2) + 80, th + 40), (255, 255, 255))
-            canvas.paste(p_pil, (20, 20))
-            canvas.paste(e_pil, (tw + 50, 20))
+            card = Image.new('RGB', ((tw * 2) + 80, th + 40), (255, 255, 255))
+            card.paste(p_pil, (20, 20))
+            card.paste(e_pil, (tw + 50, 20))
         else:
-            canvas = Image.new('RGB', (tw + 40, (th * 2) + 80), (255, 255, 255))
-            canvas.paste(p_pil, (20, 20))
-            canvas.paste(e_pil, (20, th + 50))
+            card = Image.new('RGB', (tw + 40, (th * 2) + 80), (255, 255, 255))
+            card.paste(p_pil, (20, 20))
+            card.paste(e_pil, (20, th + 50))
 
         # Apply text watermark if specified
         if watermark_text and watermark_text.strip():
             self.log("正在叠加文字水印...")
-            canvas = self.apply_text_watermark(
-                canvas,
+            card = self.apply_text_watermark(
+                card,
                 text=watermark_text,
                 opacity=watermark_opacity,
                 font_size=watermark_font_size,
                 angle=watermark_angle,
             )
 
-        canvas.save(out_path, quality=95)
+        if export_mode == "a4":
+            self.log("生成A4排版...")
+            # A4 at 300 DPI: 2480 x 3508 px
+            a4_w, a4_h = 2480, 3508
+            canvas = Image.new('RGB', (a4_w, a4_h), (255, 255, 255))
+            cx, cy = (a4_w - card.width) // 2, (a4_h - card.height) // 2
+            canvas.paste(card, (cx, cy))
+            canvas.save(out_path, quality=95)
+        else:
+            card.save(out_path, quality=95)
+
         self.log(f"处理完成！已自动将人像面置于{'上方' if layout=='vertical' else '左侧'}。")
         return out_path

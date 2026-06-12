@@ -51,6 +51,9 @@ class IDCardApp:
             'wm_size_lbl': '字体大小:',
             'wm_angle_lbl': '旋转角度:',
             'wm_preview_btn': '预览效果',
+            'menu_export_mode': '导出模式',
+            'export_image': '直接输出图片',
+            'export_a4': 'A4排版打印',
             'wm_status_on': '水印已启用：',
             'wm_status_off': '水印未启用',
         },
@@ -93,6 +96,9 @@ class IDCardApp:
             'wm_size_lbl': 'Font Size:',
             'wm_angle_lbl': 'Angle:',
             'wm_preview_btn': 'Preview',
+            'menu_export_mode': 'Export Mode',
+            'export_image': 'Direct Image',
+            'export_a4': 'A4 Print Layout',
             'wm_status_on': 'Watermark ON: ',
             'wm_status_off': 'No watermark',
         }
@@ -131,6 +137,7 @@ class IDCardApp:
         self.output_filename = tk.StringVar()
         self.output_format = tk.StringVar(value=".png")
         self.output_layout = tk.StringVar(value="vertical")
+        self.output_mode = tk.StringVar(value="image")
 
         self.p_img_ref = None
         self.e_img_ref = None
@@ -204,6 +211,13 @@ class IDCardApp:
                                         command=lambda v=internal_val: self.output_layout.set(v))
         settings_menu.add_cascade(label=S('menu_layout'), menu=layout_menu)
 
+        export_menu = tk.Menu(settings_menu, tearoff=0)
+        self._export_var = tk.StringVar(value=self.output_mode.get())
+        for mode_val, mode_key in [("image", "export_image"), ("a4", "export_a4")]:
+            export_menu.add_radiobutton(label=S(mode_key), variable=self._export_var, value=mode_val,
+                                        command=lambda v=mode_val: self.output_mode.set(v))
+        settings_menu.add_cascade(label=S('menu_export_mode'), menu=export_menu)
+
         settings_menu.add_separator()
         settings_menu.add_command(label=S('menu_watermark'), command=self.show_watermark_dialog)
 
@@ -231,10 +245,12 @@ class IDCardApp:
 
     def _switch_lang(self, lang):
         old_layout = self.output_layout.get()
+        old_export = self.output_mode.get()
         self._lang = lang
         self._rebuild_menu()
         self._refresh_ui()
         self.output_layout.set(old_layout)
+        self.output_mode.set(old_export)
         self.root.title(self._tr('title'))
 
     def _refresh_ui(self):
@@ -592,17 +608,21 @@ class IDCardApp:
         wm_font_size = self.watermark_font_size.get()
         wm_angle = self.watermark_angle.get()
 
+        export_mode = self.output_mode.get()
+
         self.btn_start.config(state='disabled')
         self.progress['value'] = 0
         self._animate_progress()
         thread = threading.Thread(target=self.run_task,
                                   args=(p, e, output_path, lyt,
-                                        wm_text, wm_opacity, wm_font_size, wm_angle),
+                                        wm_text, wm_opacity, wm_font_size, wm_angle,
+                                        export_mode),
                                   name="Worker")
         thread.start()
 
     def run_task(self, p, e, output_path, lyt,
-                 wm_text=None, wm_opacity=0.30, wm_font_size=48, wm_angle=30):
+                 wm_text=None, wm_opacity=0.30, wm_font_size=48, wm_angle=30,
+                 export_mode="image"):
         S = self._tr
         try:
             if self.processor is None:
@@ -613,7 +633,8 @@ class IDCardApp:
                                         watermark_text=wm_text,
                                         watermark_opacity=wm_opacity,
                                         watermark_font_size=wm_font_size,
-                                        watermark_angle=wm_angle)
+                                        watermark_angle=wm_angle,
+                                        export_mode=export_mode)
 
             self.root.after(0, self._stop_progress_full)
             self.update_status(S('task_done'))
