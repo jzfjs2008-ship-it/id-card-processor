@@ -27,10 +27,13 @@ class IDCardApp:
             'ok': '确定', 'cancel': '取消',
             'help_title': '使用帮助',
             'help_text': ('1. 点击左侧或右侧区域（或拖入图片）加载身份证照片。\n'
-                          '2. 程序会自动检测、裁剪并校正方向。\n'
-                          '3. 在 设置 → 布局 中选择上下放置或左右放置。\n'
-                          '4. 通过 设置 → 水印设置 可添加文字水印。\n'
-                          '5. 点击 开始合成 生成输出图片。'),
+                           '2. 程序会自动检测、裁剪并校正方向。\n'
+                           '3. 设置 → 布局：选择上下放置或左右放置。\n'
+                           '4. 设置 → 输出格式：选择PNG/JPG/TIFF等格式。\n'
+                           '5. 设置 → 导出模式：选择直接输出图片或A4排版打印。\n'
+                           '6. 设置 → 水印设置：添加自定义文字水印。\n'
+                           '7. 设置 → 语言：切换中文/英文界面。\n'
+                           '8. 点击「开始合成」生成输出图片。'),
             'copyright_title': '版权信息',
             'copyright_name': '身份证照片合成助手 v1.0',
             'copyright_email': '联系方式: jzfjs2008@gmail.com',
@@ -72,10 +75,13 @@ class IDCardApp:
             'ok': 'OK', 'cancel': 'Cancel',
             'help_title': 'Help',
             'help_text': ('1. Click the left/right area or drag an image to load ID card photos.\n'
-                          '2. The program will auto-detect, crop, and correct orientation.\n'
-                          '3. Layout: choose Vertical or Horizontal in Settings \u2192 Layout.\n'
-                          '4. Use Settings \u2192 Watermark Settings to add a text watermark.\n'
-                          '5. Click Compose to generate the output image.'),
+                           '2. The program will auto-detect, crop, and correct orientation.\n'
+                           '3. Settings → Layout: choose Vertical or Horizontal placement.\n'
+                           '4. Settings → Output Format: choose PNG/JPG/TIFF etc.\n'
+                           '5. Settings → Export Mode: choose direct image or A4 layout.\n'
+                           '6. Settings → Watermark: add custom text watermark.\n'
+                           '7. Settings → Language: switch between Chinese and English.\n'
+                           '8. Click Compose to generate the output image.'),
             'copyright_title': 'Copyright',
             'copyright_name': 'ID Card Photo Compositor v1.0',
             'copyright_email': 'Contact: jzfjs2008@gmail.com',
@@ -661,4 +667,53 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = IDCardApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
+
+    if "--screenshot" in sys.argv:
+        import time as _t
+        from PIL import ImageGrab
+
+        idx = sys.argv.index("--screenshot")
+        mode = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else "1"
+        desk = os.environ["USERPROFILE"] + r"\Desktop"
+
+        def _do_screenshot():
+            root.update_idletasks()
+            root.update()
+            _t.sleep(1)
+            root.update_idletasks()
+            root.update()
+            l, t, w, h = root.winfo_x(), root.winfo_y(), root.winfo_width(), root.winfo_height()
+            print(f"Window: {l},{t} {w}x{h}", flush=True)
+
+            if mode == "1":
+                img = ImageGrab.grab(bbox=(l, t, l + w, t + h))
+                img.save(desk + r"\Screenshot1_main.png")
+            elif mode == "2":
+                app.show_watermark_dialog()
+                root.update()
+                _t.sleep(0.5)
+                root.update()
+                img = ImageGrab.grab(bbox=(l, t, l + w, t + h))
+                img.save(desk + r"\Screenshot2_watermark.png")
+            elif mode == "3":
+                app.show_help()
+                root.update()
+                _t.sleep(0.5)
+                root.update()
+                img = ImageGrab.grab(bbox=(l, t, l + w, t + h))
+                img.save(desk + r"\Screenshot3_help.png")
+            elif mode == "4":
+                app._switch_lang("en")
+                root.update()
+                _t.sleep(0.3)
+                root.update()
+                img = ImageGrab.grab(bbox=(l, t, l + w, t + h))
+                img.save(desk + r"\Screenshot4_english.png")
+
+            root.after(500, root.destroy)
+
+        root.after(1500, _do_screenshot)
+        root.mainloop()
+        sys.exit(0)
+
     root.mainloop()
