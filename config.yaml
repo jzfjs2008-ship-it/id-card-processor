@@ -1,0 +1,91 @@
+# 身份证照片合成助手配置文件
+
+# 图像处理配置
+image_processing:
+  # 身份证标准尺寸 (mm)
+  card_width_mm: 85.6
+  card_height_mm: 54.0
+  # 输出DPI
+  output_dpi: 300
+  # 最大输入图片尺寸 (像素)，超过此尺寸会先降采样
+  max_input_size: 4096
+  # JPEG质量
+  jpeg_quality: 95
+
+# 人脸检测配置
+face_detection:
+  # 缩放因子
+  scale_factor: 1.05
+  # 最小邻居数
+  min_neighbors: 5
+  # 最小人脸尺寸 (相对于图片)
+  min_face_ratio: 0.1
+
+# 透视校正配置
+perspective_correction:
+  # Canny边缘检测阈值
+  canny_low: 20
+  canny_high: 100
+  # 高斯模糊核大小
+  gaussian_kernel: 7
+  # 最小卡片面积比例
+  min_card_area_ratio: 0.05
+
+# 水印配置
+watermark:
+  # 默认字体路径 (按优先级尝试)
+  font_paths:
+    - "C:/Windows/Fonts/msyh.ttc"      # 微软雅黑
+    - "C:/Windows/Fonts/simhei.ttf"    # 黑体
+    - "C:/Windows/Fonts/simsun.ttc"    # 宋体
+    - "C:/Windows/Fonts/arial.ttf"     # Arial
+    - "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"  # Linux
+    - "/System/Library/Fonts/PingFang.ttc"  # macOS
+  # 默认水印参数
+  default_opacity: 0.30
+  default_font_size: 48
+  default_angle: 30
+  default_color: [128, 128, 128]
+
+# A4排版配置
+a4_layout:
+  # A4尺寸 (mm)
+  width_mm: 210
+  height_mm: 297
+  # 输出DPI
+  dpi: 300
+
+# 性能配置
+performance:
+  # 是否启用多进程处理
+  enable_multiprocessing: false
+  # 最大工作进程数 (0表示自动)
+  max_workers: 0
+  # 是否缓存人脸检测模型
+  cache_face_cascade: true
+
+# 日志配置
+logging:
+  # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  # 日志文件路径 (空则不保存到文件)
+  file_path: ""
+  # 日志格式
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  # 日期格式
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+# 安全配置
+security:
+  # 最大文件大小 (MB)
+  max_file_size_mb: 50
+  # 允许的图片格式
+  allowed_formats:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+    - ".tiff"
+    - ".webp"
+  # 是否验证文件头
+  validate_file_header: true

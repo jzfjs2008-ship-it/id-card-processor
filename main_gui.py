@@ -8,6 +8,19 @@ import sys
 from datetime import datetime
 from PIL import Image, ImageTk
 from processor import IDCardProcessor
+from exceptions import (
+    IDCardProcessorError,
+    ImageLoadError,
+    ImageTooLargeError,
+    InvalidImageFormatError,
+    FaceDetectionError,
+    PerspectiveCorrectionError,
+    WatermarkError,
+    ConfigurationError,
+    SecurityError,
+    ValidationError
+)
+from logger import logger
 
 
 class IDCardApp:
@@ -117,7 +130,7 @@ class IDCardApp:
         try:
             from ctypes import windll
             windll.shcore.SetProcessDpiAwareness(1)
-        except:
+        except Exception as e:
             pass
 
         self.root.geometry("780x640")
@@ -179,7 +192,7 @@ class IDCardApp:
         try:
             self.root.iconbitmap(default=self._resource_path("logo.ico"))
             return
-        except:
+        except Exception as e:
             pass
         try:
             from PIL import ImageTk
@@ -187,7 +200,7 @@ class IDCardApp:
             self._logo_icon = ImageTk.PhotoImage(img)
             self.root.tk.call('wm', 'iconphoto', self.root._w, '-default', self._logo_icon)
             return
-        except:
+        except Exception as e:
             pass
 
     def _rebuild_menu(self):
@@ -500,16 +513,32 @@ class IDCardApp:
             self.update_status(f"{self._tr('preview_error')}{str(e)}")
 
     def set_portrait(self, path):
-        if os.path.isfile(path):
-            self.portrait_path.set(path)
-            self.lbl_p_info.config(text=f"{self._tr('selected')}{os.path.basename(path)}", foreground="#28a745")
-            self.update_preview(path, 'lbl_p_preview', 'p')
+        try:
+            if self.processor is None:
+                self.processor = IDCardProcessor(status_callback=self.update_status)
+            self.processor.validate_image_file(path)
+            
+            if os.path.isfile(path):
+                self.portrait_path.set(path)
+                self.lbl_p_info.config(text=f"{self._tr('selected')}{os.path.basename(path)}", foreground="#28a745")
+                self.update_preview(path, 'lbl_p_preview', 'p')
+        except (ImageTooLargeError, InvalidImageFormatError, ImageLoadError) as e:
+            messagebox.showerror(self._tr('error_title'), str(e))
+            logger.error(f"Failed to set portrait: {e}")
 
     def set_emblem(self, path):
-        if os.path.isfile(path):
-            self.emblem_path.set(path)
-            self.lbl_e_info.config(text=f"{self._tr('selected')}{os.path.basename(path)}", foreground="#28a745")
-            self.update_preview(path, 'lbl_e_preview', 'e')
+        try:
+            if self.processor is None:
+                self.processor = IDCardProcessor(status_callback=self.update_status)
+            self.processor.validate_image_file(path)
+            
+            if os.path.isfile(path):
+                self.emblem_path.set(path)
+                self.lbl_e_info.config(text=f"{self._tr('selected')}{os.path.basename(path)}", foreground="#28a745")
+                self.update_preview(path, 'lbl_e_preview', 'e')
+        except (ImageTooLargeError, InvalidImageFormatError, ImageLoadError) as e:
+            messagebox.showerror(self._tr('error_title'), str(e))
+            logger.error(f"Failed to set emblem: {e}")
 
     def select_save_dir(self):
         path = filedialog.askdirectory()
@@ -602,15 +631,32 @@ class IDCardApp:
         if not fname:
             messagebox.showwarning(S('warn_title'), S('warn_filename'))
             return
+        
+        if not fname.replace('_', '').replace('-', '').isalnum():
+            messagebox.showwarning(S('warn_title'), "文件名只能包含字母、数字、下划线和连字符！")
+            return
 
-        output_path = os.path.join(self.save_path.get(), f"{fname}{ext}")
+        save_dir = self.save_path.get()
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+            test_file = os.path.join(save_dir, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+        except PermissionError:
+            messagebox.showerror(S('error_title'), f"没有权限写入目录：\n{save_dir}")
+            return
+        except Exception as ex:
+            messagebox.showerror(S('error_title'), f"无法访问输出目录：\n{str(ex)}")
+            return
+
+        output_path = os.path.join(save_dir, f"{fname}{ext}")
 
         if os.path.exists(output_path):
             resp = messagebox.askyesno(S('file_exists'), S('file_exists_msg'))
             if not resp:
                 return
 
-        # Collect watermark settings
         wm_text = self.watermark_text.get().strip() if self.watermark_enabled.get() else None
         wm_opacity = self.watermark_opacity.get()
         wm_font_size = self.watermark_font_size.get()
@@ -636,6 +682,15 @@ class IDCardApp:
             if self.processor is None:
                 self.update_status(S('init_engine'))
                 self.processor = IDCardProcessor(status_callback=self.update_status)
+            
+            self.update_status("步骤 1/4: 加载并验证图像...")
+            self.root.after(0, lambda: self.progress.__setitem__('value', 25))
+
+            self.update_status("步骤 2/4: 透视校正...")
+            self.root.after(0, lambda: self.progress.__setitem__('value', 50))
+
+            self.update_status("步骤 3/4: 分析内容与方向...")
+            self.root.after(0, lambda: self.progress.__setitem__('value', 75))
 
             self.processor.process_pair(p, e, output_path, layout=lyt,
                                         watermark_text=wm_text,
@@ -649,10 +704,41 @@ class IDCardApp:
             self.root.after(0, lambda: messagebox.showinfo(S('success_title'), f"{S('success_msg')}{output_path}"))
             self.root.after(0, self.update_default_filename)
             self.root.after(0, self.clear_selection)
-        except Exception as ex:
+        except ImageTooLargeError as ex:
+            self.root.after(0, self._reset_progress)
+            error_msg = f"图片文件过大：{ex.details.get('size_mb', 0):.1f}MB\n最大允许：{ex.details.get('max_mb', 50)}MB"
+            self.update_status(f"{S('processing_failed')}{error_msg}")
+            self.root.after(0, lambda: messagebox.showerror(S('error_title'), error_msg))
+            logger.error(f"Image too large: {ex}")
+        except InvalidImageFormatError as ex:
+            self.root.after(0, self._reset_progress)
+            error_msg = f"不支持的图片格式：{ex.details.get('extension', 'unknown')}\n支持的格式：{', '.join(ex.details.get('allowed', []))}"
+            self.update_status(f"{S('processing_failed')}{error_msg}")
+            self.root.after(0, lambda: messagebox.showerror(S('error_title'), error_msg))
+            logger.error(f"Invalid format: {ex}")
+        except ImageLoadError as ex:
+            self.root.after(0, self._reset_progress)
+            error_msg = f"图片加载失败：{ex.message}"
+            self.update_status(f"{S('processing_failed')}{error_msg}")
+            self.root.after(0, lambda: messagebox.showerror(S('error_title'), error_msg))
+            logger.error(f"Image load error: {ex}")
+        except ConfigurationError as ex:
+            self.root.after(0, self._reset_progress)
+            error_msg = f"配置错误：{ex.message}\n请检查程序配置文件。"
+            self.update_status(f"{S('processing_failed')}{error_msg}")
+            self.root.after(0, lambda: messagebox.showerror(S('error_title'), error_msg))
+            logger.error(f"Configuration error: {ex}")
+        except IDCardProcessorError as ex:
             self.root.after(0, self._reset_progress)
             self.update_status(f"{S('processing_failed')}{str(ex)}")
             self.root.after(0, lambda: messagebox.showerror(S('error_title'), str(ex)))
+            logger.error(f"Processing error: {ex}")
+        except Exception as ex:
+            self.root.after(0, self._reset_progress)
+            error_msg = f"未知错误：{str(ex)}\n请查看日志获取详细信息。"
+            self.update_status(f"{S('processing_failed')}{error_msg}")
+            self.root.after(0, lambda: messagebox.showerror(S('error_title'), error_msg))
+            logger.exception(f"Unexpected error: {ex}")
         finally:
             self.root.after(0, lambda: self.btn_start.config(state='normal'))
 
