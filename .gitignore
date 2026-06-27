@@ -30,3 +30,8 @@ test_output/
 # Project runtime
 *.db
 *.log
+
+
+# Added by cargo
+
+/target
